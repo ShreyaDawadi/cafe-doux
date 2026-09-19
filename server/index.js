@@ -117,6 +117,71 @@ app.get('/api/branches/:branchId/menu', async (req, res) => {
   }
 });
 
+
+app.post('/api/orders', requireAuth, async (req, res) => {
+  const { branchId, orderType, deliveryAddress, items } = req.body;
+  // items is expected to be: [{ menuItemId: 1, quantity: 2 }, ...]
+
+  if (!branchId || !orderType || !items || items.length === 0) {
+    return res.status(400).json({ error: 'branchId, orderType, and at least one item are required' });
+  }
+
+  if (orderType === 'delivery' && !deliveryAddress) {
+    return res.status(400).json({ error: 'Delivery address is required for delivery orders' });
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Look up current prices for all items, and calculate the total
+    let total = 0;
+    const itemsWithPrices = [];
+
+    for (const item of items) {
+      const menuResult = await client.query(
+        'SELECT price FROM menu_items WHERE id = $1 AND branch_id = $2 AND available = true',
+        [item.menuItemId, branchId]
+      );
+
+      if (menuResult.rows.length === 0) {
+        throw new Error(`Menu item ${item.menuItemId} not found or unavailable at this branch`);
+      }
+
+      const price = parseFloat(menuResult.rows[0].price);
+      total += price * item.quantity;
+      itemsWithPrices.push({ ...item, price });
+    }
+
+    // Create the order itself
+    const orderResult = await client.query(
+      `INSERT INTO orders (user_id, branch_id, order_type, delivery_address, total)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [req.userId, branchId, orderType, deliveryAddress || null, total]
+    );
+    const order = orderResult.rows[0];
+
+    // Create each order_item, linked to this order
+    for (const item of itemsWithPrices) {
+      await client.query(
+        `INSERT INTO order_items (order_id, menu_item_id, quantity, price_at_order)
+         VALUES ($1, $2, $3, $4)`,
+        [order.id, item.menuItemId, item.quantity, item.price]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({ order, itemCount: items.length });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
+    res.status(500).json({ error: err.message || 'Failed to place order' });
+  } finally {
+    client.release();
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Café Doux backend running on http://localhost:${PORT}`);
 });
