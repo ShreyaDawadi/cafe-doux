@@ -3,10 +3,10 @@ const bcrypt = require('bcrypt');
 const pool = require('./db');
 
 async function createAdmin() {
-  const name = 'Thamel Branch Manager';
-  const email = 'admin.thamel@cafedoux.com';
-  const password = 'adminpass123';
-  const branchId = 1; // Thamel branch
+  const name = 'Lakeside Branch Manager';
+const email = 'admin.lakeside@cafedoux.com';
+const password = 'adminpass123';
+const branchId = 2; // Lakeside branch
 
   const passwordHash = await bcrypt.hash(password, 10);
 

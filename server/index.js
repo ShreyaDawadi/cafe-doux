@@ -182,6 +182,124 @@ app.post('/api/orders', requireAuth, async (req, res) => {
   }
 });
 
+// ---------- BRANCH ADMIN ROUTES ----------
+
+// Get all menu items for the admin's own branch (including unavailable ones)
+app.get('/api/admin/menu', requireAuth, requireBranchAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM menu_items WHERE branch_id = $1 ORDER BY category, name',
+      [req.userBranchId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch menu' });
+  }
+});
+
+// Add a new menu item to the admin's own branch
+app.post('/api/admin/menu', requireAuth, requireBranchAdmin, async (req, res) => {
+  const { name, description, price, category } = req.body;
+
+  if (!name || !price || !category) {
+    return res.status(400).json({ error: 'name, price, and category are required' });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO menu_items (branch_id, name, description, price, category)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [req.userBranchId, name, description || null, price, category]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to add menu item' });
+  }
+});
+
+// Update a menu item — but only if it belongs to the admin's own branch
+app.put('/api/admin/menu/:id', requireAuth, requireBranchAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { name, description, price, category, available } = req.body;
+
+  try {
+    const existing = await pool.query('SELECT branch_id FROM menu_items WHERE id = $1', [id]);
+
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Menu item not found' });
+    }
+
+    if (existing.rows[0].branch_id !== req.userBranchId) {
+      return res.status(403).json({ error: 'You can only edit menu items at your own branch' });
+    }
+
+    const result = await pool.query(
+      `UPDATE menu_items
+       SET name = $1, description = $2, price = $3, category = $4, available = $5
+       WHERE id = $6 RETURNING *`,
+      [name, description, price, category, available, id]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update menu item' });
+  }
+});
+
+// View incoming orders for the admin's own branch
+app.get('/api/admin/orders', requireAuth, requireBranchAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT o.*, u.name as customer_name, u.email as customer_email
+       FROM orders o
+       JOIN users u ON o.user_id = u.id
+       WHERE o.branch_id = $1
+       ORDER BY o.created_at DESC`,
+      [req.userBranchId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
+
+// Update an order's status — only for orders at the admin's own branch
+app.put('/api/admin/orders/:id/status', requireAuth, requireBranchAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  const validStatuses = ['pending', 'preparing', 'ready', 'completed'];
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ error: 'Invalid status value' });
+  }
+
+  try {
+    const existing = await pool.query('SELECT branch_id FROM orders WHERE id = $1', [id]);
+
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    if (existing.rows[0].branch_id !== req.userBranchId) {
+      return res.status(403).json({ error: 'You can only update orders at your own branch' });
+    }
+
+    const result = await pool.query(
+      'UPDATE orders SET status = $1 WHERE id = $2 RETURNING *',
+      [status, id]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update order status' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Café Doux backend running on http://localhost:${PORT}`);
 });
