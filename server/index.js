@@ -89,6 +89,34 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+
+// ---------- PUBLIC BRANCH & MENU ROUTES ----------
+
+app.get('/api/branches', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM branches ORDER BY city');
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch branches' });
+  }
+});
+
+app.get('/api/branches/:branchId/menu', async (req, res) => {
+  const { branchId } = req.params;
+
+  try {
+    const result = await pool.query(
+      'SELECT * FROM menu_items WHERE branch_id = $1 AND available = true ORDER BY category, name',
+      [branchId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch menu' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Café Doux backend running on http://localhost:${PORT}`);
 });
