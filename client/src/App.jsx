@@ -4,6 +4,7 @@ import { CartProvider } from './CartContext';
 import AuthForm from './AuthForm';
 import BranchList from './pages/BranchList';
 import { useState } from 'react';
+import BranchMenu from './pages/BranchMenu';
 
 function App() {
   const { user, logout } = useAuth();
@@ -40,6 +41,7 @@ function App() {
 
           <Routes>
             <Route path="/" element={<BranchList />} />
+            <Route path="/branch/:branchId" element={<BranchMenu />} />
           </Routes>
 
           {showAuthForm && <AuthForm onClose={() => setShowAuthForm(false)} />}
