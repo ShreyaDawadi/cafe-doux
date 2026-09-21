@@ -1,13 +1,13 @@
-
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { useState } from 'react';
 import { useAuth } from './AuthContext';
 import { CartProvider } from './CartContext';
 import AuthForm from './AuthForm';
 import BranchList from './pages/BranchList';
-import { useState } from 'react';
 import BranchMenu from './pages/BranchMenu';
 import Checkout from './pages/Checkout';
 import OrderHistory from './pages/OrderHistory';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import AdminDashboard from './pages/AdminDashboard';
 
 function App() {
   const { user, logout } = useAuth();
@@ -21,8 +21,12 @@ function App() {
             <div className="absolute top-4 right-4">
               {user ? (
                 <div className="flex items-center gap-3 text-sm">
-                <Link to="/orders" className="hover:underline">My Orders</Link>
-                <span>Hi, {user.name}</span>
+                  {user.role === 'branch_admin' ? (
+                    <Link to="/admin" className="hover:underline">Dashboard</Link>
+                  ) : (
+                    <Link to="/orders" className="hover:underline">My Orders</Link>
+                  )}
+                  <span>Hi, {user.name}</span>
                   <button
                     onClick={logout}
                     className="bg-[#6B4530] px-3 py-1 rounded-lg hover:bg-[#7d5238]"
@@ -39,7 +43,9 @@ function App() {
                 </button>
               )}
             </div>
-            <h1 className="text-4xl font-serif">Café Doux</h1>
+            <Link to="/">
+              <h1 className="text-4xl font-serif">Café Doux</h1>
+            </Link>
             <p className="mt-2 text-[#D4B896]">Coffee, pastries, and a little sweetness</p>
           </header>
 
@@ -48,6 +54,7 @@ function App() {
             <Route path="/branch/:branchId" element={<BranchMenu />} />
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/orders" element={<OrderHistory />} />
+            <Route path="/admin" element={<AdminDashboard />} />
           </Routes>
 
           {showAuthForm && <AuthForm onClose={() => setShowAuthForm(false)} />}
