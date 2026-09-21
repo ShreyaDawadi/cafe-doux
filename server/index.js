@@ -182,6 +182,23 @@ app.post('/api/orders', requireAuth, async (req, res) => {
   }
 });
 
+app.get('/api/orders/my', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT o.*, b.name as branch_name
+       FROM orders o
+       JOIN branches b ON o.branch_id = b.id
+       WHERE o.user_id = $1
+       ORDER BY o.created_at DESC`,
+      [req.userId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
+
 // ---------- BRANCH ADMIN ROUTES ----------
 
 // Get all menu items for the admin's own branch (including unavailable ones)
